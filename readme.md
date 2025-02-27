@@ -18,6 +18,8 @@ this app triggers the dbus filepicker to select a file, then uploads it to a pas
 
 ## usage
 
+1. set PASTEBIN_URL env variable
+
 1. set the AUTH_KEY and AUTH_PARAM environment variable if your pastebin service requires an API key.
 
 1. run the app:
