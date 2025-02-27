@@ -9,13 +9,19 @@ import (
 	"os"
 	"path"
 	"strings"
+
+	"github.com/atotto/clipboard"
 )
 
-const pasteURL = "https://paste.jabuxas.com"
-
+var pasteURL = os.Getenv("PASTEBIN_URL")
 var key = os.Getenv("AUTH_KEY")
 
 func main() {
+	if pasteURL == "" || key == "" {
+		fmt.Println("Please set PASTEBIN_URL and AUTH_KEY environment variables")
+		return
+	}
+
 	file := strings.Split(SelectFile(), "file://")[1]
 	request, err := uploadFile(file)
 
@@ -33,7 +39,10 @@ func main() {
 	defer res.Body.Close()
 
 	respBody, _ := io.ReadAll(res.Body)
-	fmt.Println(string(respBody))
+
+	if err := clipboard.WriteAll(string(respBody)); err != nil {
+		panic(err)
+	}
 }
 
 func uploadFile(file string) (*http.Request, error) {
