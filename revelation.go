@@ -16,10 +16,11 @@ import (
 
 var pasteURL = os.Getenv("PASTEBIN_URL")
 var key = os.Getenv("AUTH_KEY")
+var authParam = os.Getenv("AUTH_PARAM")
 
 func main() {
-	if pasteURL == "" || key == "" {
-		fmt.Println("Please set PASTEBIN_URL and AUTH_KEY environment variables")
+	if pasteURL == "" {
+		fmt.Println("Please set PASTEBIN_URL environment variable")
 		return
 	}
 
@@ -80,7 +81,7 @@ func uploadFile(file string) (*http.Request, error) {
 	}
 
 	// set headers
-	req.Header.Set("X-Auth", key)
+	req.Header.Set(authParam, key)
 	req.Header.Set("Content-Type", writer.FormDataContentType())
 
 	return req, nil
