@@ -6,6 +6,7 @@ import (
 	"io"
 	"mime/multipart"
 	"net/http"
+	"net/url"
 	"os"
 	"path"
 	"strings"
@@ -23,7 +24,9 @@ func main() {
 	}
 
 	file := strings.Split(SelectFile(), "file://")[1]
-	request, err := uploadFile(file)
+	output, _ := url.QueryUnescape(file)
+
+	request, err := uploadFile(output)
 
 	if err != nil {
 		fmt.Println("Error creating request:", err)
