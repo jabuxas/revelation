@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 
 	"github.com/godbus/dbus/v5"
@@ -24,7 +23,6 @@ func SelectFile() string {
 	responsePath := openFileDialog(conn)
 	setupSignalHandler(conn, responsePath)
 
-	fmt.Println("File picker triggered, waiting for response...")
 	return processSignal(<-waitForSignal(conn), responsePath)
 }
 
