@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path"
-	// "strings"
+	"strings"
 )
 
 const pasteURL = "https://paste.jabuxas.com"
@@ -16,8 +16,7 @@ const pasteURL = "https://paste.jabuxas.com"
 var key = os.Getenv("AUTH_KEY")
 
 func main() {
-	// file := strings.Split(SelectFile(), "file://")[1]
-	file := "/yang/tmp/netin.json"
+	file := strings.Split(SelectFile(), "file://")[1]
 	request, err := uploadFile(file)
 
 	if err != nil {
@@ -48,7 +47,6 @@ func uploadFile(file string) (*http.Request, error) {
 	// prepare multipart form data
 	data := &bytes.Buffer{}
 	writer := multipart.NewWriter(data)
-	defer writer.Close()
 
 	// create the form file part
 	part, err := writer.CreateFormFile("file", path.Base(file))
@@ -61,6 +59,7 @@ func uploadFile(file string) (*http.Request, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error copying file content: %v", err)
 	}
+	writer.Close()
 
 	// create the HTTP request
 	req, err := http.NewRequest("POST", pasteURL, data)
@@ -71,7 +70,6 @@ func uploadFile(file string) (*http.Request, error) {
 	// set headers
 	req.Header.Set("X-Auth", key)
 	req.Header.Set("Content-Type", writer.FormDataContentType())
-	req.ContentLength = int64(data.Len())
 
 	return req, nil
 }
