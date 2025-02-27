@@ -2,8 +2,13 @@ package main
 
 import (
 	"fmt"
+	"strings"
 )
 
 func main() {
-	fmt.Println(SelectFile())
+	uploadFile(strings.Split(SelectFile(), "file://")[1])
+}
+
+func uploadFile(file string) {
+	fmt.Println(file)
 }

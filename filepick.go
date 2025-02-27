@@ -3,63 +3,95 @@ package main
 import (
 	"fmt"
 	"log"
-	"os"
 
 	"github.com/godbus/dbus/v5"
 )
 
+const (
+	busName        = "org.freedesktop.portal.Desktop"
+	objectPath     = "/org/freedesktop/portal/desktop"
+	methodName     = "org.freedesktop.portal.FileChooser.OpenFile"
+	requestIFace   = "org.freedesktop.portal.Request"
+	responseSignal = "Response"
+	handleToken    = "revelation"
+	dialogTitle    = "Choose file"
+)
+
 func SelectFile() string {
-	conn, err := dbus.ConnectSessionBus()
-	if err != nil {
-		fmt.Fprintln(os.Stderr, "Failed to connect to session bus:", err)
-		os.Exit(1)
-	}
+	conn := connectDBus()
 	defer conn.Close()
 
-	token := "revelation"
+	responsePath := openFileDialog(conn)
+	setupSignalHandler(conn, responsePath)
+
+	fmt.Println("File picker triggered, waiting for response...")
+	return processSignal(<-waitForSignal(conn), responsePath)
+}
+
+func connectDBus() *dbus.Conn {
+	conn, err := dbus.ConnectSessionBus()
+	if err != nil {
+		log.Fatalf("Failed to connect to session bus: %v", err)
+	}
+	return conn
+}
+
+func openFileDialog(conn *dbus.Conn) dbus.ObjectPath {
 	options := map[string]dbus.Variant{
-		"handle_token": dbus.MakeVariant(token),
-		"title":        dbus.MakeVariant("Choose file"),
+		"handle_token": dbus.MakeVariant(handleToken),
+		"title":        dbus.MakeVariant(dialogTitle),
 	}
 
-	obj := conn.Object("org.freedesktop.portal.Desktop", "/org/freedesktop/portal/desktop")
-	call := obj.Call("org.freedesktop.portal.FileChooser.OpenFile", 0, "revelation", "", options)
+	call := conn.Object(busName, objectPath).Call(methodName, 0, "", "", options)
 	if call.Err != nil {
 		log.Fatalf("Failed to trigger file picker: %v", call.Err)
 	}
 
-	replyPath := call.Body[0].(dbus.ObjectPath)
+	return call.Body[0].(dbus.ObjectPath)
+}
 
-	err = conn.AddMatchSignal(
-		dbus.WithMatchOption("interface", "org.freedesktop.portal.Request"),
-		dbus.WithMatchOption("member", "Response"),
-		dbus.WithMatchOption("path", string(replyPath)),
+func setupSignalHandler(conn *dbus.Conn, path dbus.ObjectPath) {
+	err := conn.AddMatchSignal(
+		dbus.WithMatchInterface(requestIFace),
+		dbus.WithMatchMember(responseSignal),
+		dbus.WithMatchPathNamespace(path),
 	)
 	if err != nil {
-		log.Fatalf("Failed to add match signal: %v", err)
+		log.Fatalf("Failed to add signal match: %v", err)
+	}
+}
+
+func waitForSignal(conn *dbus.Conn) <-chan *dbus.Signal {
+	ch := make(chan *dbus.Signal, 1)
+	conn.Signal(ch)
+	return ch
+}
+
+func processSignal(signal *dbus.Signal, expectedPath dbus.ObjectPath) string {
+	if signal.Path != expectedPath || signal.Name != requestIFace+"."+responseSignal {
+		return ""
 	}
 
-	c := make(chan *dbus.Signal, 1)
-	conn.Signal(c)
+	if len(signal.Body) < 2 {
+		// nothing selected
+		return ""
+	}
 
-	for signal := range c {
-		if signal.Path == replyPath && signal.Name == "org.freedesktop.portal.Request.Response" {
-			reply := signal.Body
-			if len(reply) > 1 {
-				results, ok := reply[1].(map[string]dbus.Variant)
-				if ok {
-					if urisVariant, exists := results["uris"]; exists {
-						uris, ok := urisVariant.Value().([]string)
-						if ok && len(uris) > 0 {
-							return uris[0]
-						} else {
-							return ""
-						}
-					}
-				}
-			}
-			break
-		}
+	results, ok := signal.Body[1].(map[string]dbus.Variant)
+	if !ok {
+		// invalid response
+		return ""
+	}
+
+	urisVariant, exists := results["uris"]
+	if !exists {
+		// nothing selected
+		return ""
+	}
+
+	uris, ok := urisVariant.Value().([]string)
+	if ok && len(uris) > 0 {
+		return uris[0]
 	}
 	return ""
 }
